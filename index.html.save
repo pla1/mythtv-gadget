@@ -1,0 +1,225 @@
+<html>
+  <head>
+    <title>MythTV Gadget</title>
+    <link href='http://fonts.googleapis.com/css?family=Ubuntu' rel='stylesheet' type='text/css'> 
+    <style>
+      body.drag {
+        -webkit-app-region: drag;
+      }
+      .noDrag {
+        -webkit-app-region: no-drag;
+      }
+      div, h1, p {
+        font-family: 'Ubuntu', sans-serif;
+      }
+      div {
+        font-size:15px;
+        margin:5px;
+      }
+      h1 {
+        font-size:30px;  
+        margin:2px;
+      }
+      h2 {
+        font-size:20px;  
+        margin:2px;
+      }
+      p {
+        margin:2px;
+      }
+      .formField {
+        font-size:10pt; 
+      }
+      #pageDiv {
+        background: -webkit-gradient(linear, left top, left bottom, from(#ccc), to(#000));
+      }
+      #southDiv {
+        position:absolute;
+        bottom:0;
+        background: -webkit-gradient(linear, 0% 0%, 0% 100%, from(rgba(204,204,204,0.2)), to(rgba(255,255,255,0.7)));
+        width:93%;
+      }
+    </style>
+    <script src="http://code.jquery.com/jquery-latest.js"></script>
+    <script src="date.js"></script>
+    <script>
+      if ($.isBlank(localStorage.backendServerIp)) {
+        localStorage.mode='Recorded';
+        displaySettings();
+      }
+      var gui = require('nw.gui');
+      var mode = localStorage.mode;
+      document.onkeydown = checkKey;
+      var GetUpcomingListStartIndex = 0;
+      var GetRecordedListStartIndex = 0;  
+      var FileName = "";
+      function checkKey(e) {
+        e = e || window.event;
+        console.log('Key pressed: ' + e.keyCode);
+        if (e.keyCode=='27' | e.keyCode=='81') {
+          gui.App.quit();
+        }
+        if (e.keyCode=='72') {
+          displayHelp();
+        }
+        if (e.keyCode=='36') {
+          getList(-999999);
+        }
+        if (e.keyCode=='83') {
+          displaySettings();
+          return false; 
+        }
+        if (e.keyCode=='82') {
+          localStorage.mode='Recorded';
+          setup();
+        }
+        if (e.keyCode=='85') {
+          localStorage.mode='Upcoming';
+          setup();
+        }
+        if ((e.keyCode=='80' | e.keyCode=='13') && isRecorded()) {
+          play();
+        }
+        if ($('#submitButton') && e.keyCode=='13') {
+          $('#submitButton').click();
+        }
+        if ((isRecorded() | isUpcoming()) && e.keyCode=='37') {
+          getList(-1);
+        }
+        if ((isRecorded() | isUpcoming()) && e.keyCode=='39') {
+          getList(1);
+        }
+      }
+      function storeFormData() {
+        localStorage.backendServerIp=$('#backendServerIp').val();
+        localStorage.backendServerPort=$('#backendServerPort').val();
+        localStorage.gmtOffset=$('#gmtOffset').val();
+        getList(0);
+      }
+      function fillFormData() {
+        $('#backendServerIp').val(localStorage.backendServerIp);
+        $('#backendServerPort').val(localStorage.backendServerPort);
+        $('#gmtOffset').val(localStorage.gmtOffset);
+        $('#backendServerIp').focus();
+      }
+      function cleanPage() {
+        $('#northDiv').empty();
+        $('#centerDiv').empty();
+        $('#southDiv').empty();
+        $('body').css('background', 'none');
+        $('#pageDiv').css('background', 'none');
+        mode = '';
+      }
+      function displaySettings() {
+        cleanPage();
+        $('#northDiv').html('<h1>Settings</h1>');
+        $('#centerDiv').append('<div class=formField>MythTV server IP (192.168.1.5):<input id=backendServerIp type=text /><div>');
+        $('#centerDiv').append('<div class=formField>MythTV service API port (6544):<input id=backendServerPort type=text size=6 maxlength=6 /><div>');
+        $('#centerDiv').append('<div class=formField>GMT offset (-5):<input id=gmtOffset type=text size=6 maxlength=6 /><div>');
+        $('#centerDiv').append('<div class=formField><button id=submitButton class=noDrag onclick="storeFormData();return false;">Submit</button><div>');
+        fillFormData();
+      }
+      function displayHelp() {
+        cleanPage();
+        $('#northDiv').html('<h1>Help</h1>');
+        $('#centerDiv').html('<h2>Keyboard Shortcuts</h2><ul id="shortcut"></ul>');
+        var shortcuts = ["left arrow=previous","right arrow=next","Enter=play", "Home=home", "h=help","p=play", "q=quit","r=recordings","s=settings","u=upcoming"];
+        var $shortcutContainer = $("#shortcut");
+        $.each(shortcuts, function(index, value) {
+          var $li = $("<li/>").html(value).appendTo($shortcutContainer).hide();
+        });
+        $("li", $shortcutContainer).slideDown(1000); 
+        $('#centerDiv').append("<p><i>NOTE: Keyboard shortcuts active where appropriate.</i></p>");
+      }
+      function play() {
+        var urlString = 'myth://Default@'+localStorage.backendServerIp+':'+localStorage.backendServerPort+'/'+FileName;
+        gui.Shell.openExternal(urlString);
+      }
+      function isRecorded() {
+        return mode=='Recorded';
+      }
+      function isUpcoming() {
+        return mode=='Upcoming';
+      }
+      function setup() {
+        mode = localStorage.mode;
+        if ($.isBlank(mode)) {
+          mode='Recorded';
+        }
+        getList(0)
+      }
+
+        $.isBlank = function(obj){
+          return(!obj || $.trim(obj) === "");
+        };
+      })(jQuery);
+
+      function getUriPartOne() {
+        return 'http://'+localStorage.backendServerIp+':'+localStorage.backendServerPort;
+      }
+
+      function getList(increment) {
+        cleanPage();
+        mode = localStorage.mode;
+        $('body').css('background', '-webkit-gradient(linear, left top, left bottom, from(#ccc), to(#000))');
+        var urlString;
+        if (isRecorded()) {
+          GetRecordedListStartIndex = GetRecordedListStartIndex + increment; 
+          if (GetRecordedListStartIndex < 0) {
+            GetRecordedListStartIndex = 0;
+          }
+          urlString = getUriPartOne()+'/Dvr/GetRecordedList?StartIndex='+GetRecordedListStartIndex+'&Count=1&Descending=true';
+        } else {
+          GetUpcomingListStartIndex = GetUpcomingListStartIndex + increment; 
+          if (GetUpcomingListStartIndex < 0) {
+            GetUpcomingListStartIndex = 0;
+          }
+          urlString = getUriPartOne()+'/Dvr/GetUpcomingList?StartIndex='+GetUpcomingListStartIndex+'&Count=1';
+        }
+        console.log(urlString);
+        $('#southDiv').empty();
+        $.getJSON(urlString, function(data) {
+          var jsonItems = data.ProgramList.Programs;
+          $.each(jsonItems, function(i,item) {
+            $('#southDiv').append('<h1>'+item.Title+'</h1>');
+            if (!$.isBlank(item.SubTitle)) {
+              $('#southDiv').append('<p>'+item.SubTitle+'</p>');
+            }
+            if (!$.isBlank(item.Description)) {
+              $('#southDiv').append('<p><i>'+item.Description+'</i></p>');
+            }
+            FileName=item.FileName;
+            if (item.StartTime) {
+              var dateString = item.StartTime.replace('Z','').replace('T',' ');
+              var date = Date.parse(dateString);
+              if (date) {
+                var gmtOffset = localStorage.gmtOffset * 1;
+                date = date.add(gmtOffset).hours();
+                $('#southDiv').append('<p>'+date.toString('dddd, MMMM d, yyyy hh:mm tt')+'</p>');
+              } else {
+                $('#southDiv').append('<p>'+dateString+'</p>');
+              }
+            }
+            var Artwork = item.Artwork;
+            $.each(Artwork.ArtworkInfos, function(j,item) {
+              if (item.URL && j ==0) {
+                var imageUrl = getUriPartOne() + encodeURI(item.URL);
+                console.log(imageUrl);
+                var bg = 'url('+imageUrl+')';
+                $('body').css('background-image', bg);
+              }
+            });
+          });
+          $('#southDiv').append('<p style="font-weight:bold;text-align:center">'+localStorage.mode+'</p>'); 
+        });
+      }
+    </script>
+  </head>
+  <body onload="setup();" class="drag">
+    <div id=pageDiv>
+      <div id=northDiv></div>
+      <div id=centerDiv></div>
+      <div id=southDiv></div>
+    </div>
+  </body>
+</html>
