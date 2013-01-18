@@ -99,6 +99,9 @@
       }
       function fillFormData() {
         $('#backendServerIp').val(localStorage.backendServerIp);
+        if ($.isBlank(localStorage.backendServerPort)) {
+          localStorage.backendServerPort=6544;
+        }
         $('#backendServerPort').val(localStorage.backendServerPort);
         $('#gmtOffset').val(localStorage.gmtOffset);
         $('#backendServerIp').focus();
