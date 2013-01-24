@@ -5,14 +5,15 @@
   "version": "0.1",
   "keywords": [ "MythTV", "DVR", "Video" ],
   "window": {
-     "frame": false,
-     "toolbar": false,
-     "width": 400,
-     "height": 578,
-     "position": "mouse", 
-     "min_width": 400,
-     "min_height": 578,
-     "max_width": 400,
-     "max_height": 578
+    "frame": false,
+    "toolbar": false,
+    "width": 400,
+    "height": 578,
+    "position": "mouse", 
+    "min_width": 400,
+    "min_height": 578,
+    "max_width": 400,
+    "max_height": 578,
+    "show": false
   }
 }

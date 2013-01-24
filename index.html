@@ -30,6 +30,9 @@
       .formField {
         font-size:10pt; 
       }
+      .encoderStatus {
+        font-size:10pt;
+      }
       #pageDiv {
         background: -webkit-gradient(linear, left top, left bottom, from(#ccc), to(#000));
       }
@@ -43,13 +46,58 @@
     <script src="http://code.jquery.com/jquery-latest.js"></script>
     <script src="date.js"></script>
     <script>
+      var gui = require('nw.gui');
+      var win = gui.Window.get();
+      var mode = localStorage.mode;            
       (function($){
         $.isBlank = function(obj){
           return(!obj || $.trim(obj) === "");
         };
       })(jQuery);
-      var gui = require('nw.gui');
-      var mode = localStorage.mode;
+      function isRecorded() {
+        return mode=='Recorded';
+      }
+      function isUpcoming() {
+        return mode=='Upcoming';
+      }
+      console.log('Arguments quantity:' + gui.App.argv.length + ' argument values: '  + gui.App.argv);
+      
+      function numberOfEncoders() {
+        var date = new Date();
+        var urlString = getUriPartOne() + '/Dvr/GetEncoderList?cacheBuster=' + date.getTime();
+        console.log(date + ' ' + urlString);
+        var quantity = 1; 
+        $.ajax({
+          type: 'GET', 
+          url: urlString, 
+          data:{}, 
+          dataType: 'json',
+          success: function(data) {
+            quantity = data.EncoderList.Encoders.length;
+          }, 
+          async: false
+        });
+        return quantity; 
+      }
+      if (gui.App.argv.length > 0) {
+        console.log('Running MythTV tuner status widget'); 
+        mode = 'widget';
+        //  console.log(numberOfEncoders() + " encoders");
+        win.resizeTo(400,35+ (30 * numberOfEncoders()));
+        win.show();
+      } else {
+        console.log('Running MythTV gadget'); 
+        if (!isRecorded()) {
+          if (!isUpcoming()){
+            console.log('Correcting mode');
+            localStorage.mode='Recorded';
+            mode = localStorage.mode;
+          }
+        }
+        console.log("MODE *****" + mode);
+        win.show();
+      }
+      
       document.onkeydown = checkKey;
       var GetUpcomingListStartIndex = 0;
       var GetRecordedListStartIndex = 0;  
@@ -64,7 +112,11 @@
           displayHelp();
         }
         if (e.keyCode=='36') {
-          getList(-999999);
+          if (mode=='widget') {
+            listEncoders();
+          } else {
+            getList(-999999);
+          }
         }
         if (e.keyCode=='83') {
           displaySettings();
@@ -140,21 +192,41 @@
         console.log("Play recording URL: " + urlString);
         gui.Shell.openExternal(urlString);
       }
-      function isRecorded() {
-        return mode=='Recorded';
-      }
-      function isUpcoming() {
-        return mode=='Upcoming';
-      }
       function setup() {
-        mode = localStorage.mode;
         if ($.isBlank(mode)) {
           mode='Recorded';
         }
-        getList(0)
+        console.log("mode: " + mode);
+        if (mode=='widget') {
+          listEncoders();
+        } else {
+          getList(0);
+        }
       }
       function getUriPartOne() {
         return 'http://'+localStorage.backendServerIp+':'+localStorage.backendServerPort;
+      }
+      
+      function listEncoders() {
+        cleanPage();
+        console.log(numberOfEncoders() + " encoders");
+        $('body').css('background', '-webkit-gradient(linear, left top, left bottom, from(#ccc), to(#777))');
+        mode='widget';
+        var date = new Date();
+        var urlString = getUriPartOne() + '/Dvr/GetEncoderList?cacheBuster=' + date.getTime();
+        console.log(date + ' ' + urlString);
+        $.getJSON(urlString, function(data) {
+          var encoders = data.EncoderList.Encoders; 
+          $('#northDiv').html(encoders.length + " encoders");
+          $.each(encoders, function(i,encoder) {
+            if (encoder.State=='0') {
+              $('#centerDiv').append('<div class=encoderStatus>' + encoder.Id + ' Idle');
+            } else {
+              $('#centerDiv').append('<div class=encoderStatus>' + encoder.Recording.Title + ' <i>' + encoder.Recording.SubTitle + '</i> ' + encoder.Recording.Channel.ChannelName);
+            }
+          });
+        });
+        setTimeout('listEncoders()',10000);
       }
       function getList(increment) {
         if ($.isBlank(localStorage.backendServerIp)) {
